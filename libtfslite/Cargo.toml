@@ -1,0 +1,28 @@
+[package]
+name = "libtfslite"
+version = "0.2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sawtooth-sdk = { git = "https://github.com/taekion-org/sawtooth-sdk-rust.git", version = "0.5", default-features = false }
+cylinder = { version = "0.3", features = ["key-load"] }
+protobuf = "2"
+ciborium = "0.2"
+sha2 = "0.10"
+hex = "0.4"
+serde = "1.0"
+serde_repr = "0.1"
+rand = "0.8"
+uuid = { version = "1.6", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
+wasm-bindgen = { version = "0.2.89", optional = true }
+
+[features]
+default = []
+traits = ["sawtooth-sdk/processor", "sawtooth-sdk/messaging"]
+client = []
+wasm = ["wasm-bindgen"]
+
+[build-dependencies]
+protoc-rust = "2.0"

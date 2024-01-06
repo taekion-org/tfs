@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+message Payload {
+  enum Operation {
+    FILE_CREATE = 0;
+    FILE_APPEND = 1;
+    FILE_SEAL = 2;
+    FILE_DESTROY = 3;
+    ACCOUNT_DEPOSIT = 4;
+    ACCOUNT_TRANSFER = 5;
+    PERMISSION_SET = 6;
+    PERMISSION_CLEAR = 7;
+    TIMESTAMP_SET = 8;
+  }
+
+  enum FileMode {
+    IMMUTABLE = 0;
+    DESTROYABLE = 1;
+  }
+
+  enum Permission {
+    UNSET = 0;
+    SET_PERMISSION = 1;
+    BATCHER = 2;
+    DEPOSIT = 3;
+    TIMESTAMP = 4;
+  }
+
+  message DataBlock {
+    bytes data = 1;
+    bytes sha224 = 2;
+    uint64 number = 3;
+  }
+
+  Operation operation = 1;
+  bytes uuid = 2;
+  FileMode mode = 3;
+  DataBlock block = 4;
+  string filename = 5;
+  uint64 amount = 6;
+  bytes address = 7;
+  Permission permission = 9;
+  bytes permission_public_key = 10;
+  int64 timestamp_create = 11;
+  int64 timestamp_append = 12;
+  int64 timestamp_seal = 13;
+}
