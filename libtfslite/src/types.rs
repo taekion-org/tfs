@@ -22,7 +22,7 @@ impl Display for FileState {
     }
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum FileMode {
     Destroyable = 1,
