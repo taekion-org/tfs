@@ -28,6 +28,7 @@ pub struct FileListEntryIntermediate {
     state: String,
     mode: String,
     last_updated: Option<DateTime<Utc>>,
+    name: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -38,6 +39,29 @@ pub struct FileListEntry {
     state: FileState,
     mode: FileMode,
     last_updated: Option<DateTime<Utc>>,
+    name: Option<String>,
+}
+
+impl FileListEntry {
+    pub fn get_id(&self) -> uuid::Uuid {
+        self.id
+    }
+
+    pub fn get_state(&self) -> FileState {
+        self.state
+    }
+
+    pub fn get_mode(&self) -> FileMode {
+        self.mode
+    }
+
+    pub fn get_last_updated(&self) -> Option<DateTime<Utc>> {
+        self.last_updated
+    }
+
+    pub fn get_name(&self) -> Option<String> {
+        self.name.clone()
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -77,6 +101,10 @@ impl TryFrom<&FileListEntryIntermediate> for FileListEntry {
                 },
             },
             last_updated: value.last_updated,
+            name: match &value.name {
+                Some(name) => Some(name.clone()),
+                None => None,
+            },
         };
         Ok(entry)
     }
