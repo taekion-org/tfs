@@ -153,7 +153,8 @@ impl PayloadBuilder {
                 let uuid = self.uuid.ok_or_else(|| {
                     PayloadBuildError::MissingField("Field 'uuid' is required".to_string())
                 })?;
-                payload.set_uuid(uuid.as_ref().to_vec());
+                let uuid_ref: &[u8] = uuid.as_ref();
+                payload.set_uuid(uuid_ref.to_vec());
 
                 let mode = self.mode.ok_or_else(|| {
                     PayloadBuildError::MissingField("Field 'mode' is required".to_string())
@@ -168,7 +169,8 @@ impl PayloadBuilder {
                 let uuid = self.uuid.ok_or_else(|| {
                     PayloadBuildError::MissingField("Field 'uuid' is required".to_string())
                 })?;
-                payload.set_uuid(uuid.as_ref().to_vec());
+                let uuid_ref: &[u8] = uuid.as_ref();
+                payload.set_uuid(uuid_ref.to_vec());
 
                 let block = self.block.ok_or_else(|| {
                     PayloadBuildError::MissingField("Field 'block' is required".to_string())
@@ -179,7 +181,8 @@ impl PayloadBuilder {
                 let uuid = self.uuid.ok_or_else(|| {
                     PayloadBuildError::MissingField("Field 'uuid' is required".to_string())
                 })?;
-                payload.set_uuid(uuid.as_ref().to_vec());
+                let uuid_ref: &[u8] = uuid.as_ref();
+                payload.set_uuid(uuid_ref.to_vec());
             },
             Payload_Operation::ACCOUNT_DEPOSIT | Payload_Operation::ACCOUNT_TRANSFER => {
                 let address = self.address.ok_or_else(|| {
@@ -213,7 +216,8 @@ impl PayloadBuilder {
                 let uuid = self.uuid.ok_or_else(|| {
                     PayloadBuildError::MissingField("Field 'uuid' is required".to_string())
                 })?;
-                payload.set_uuid(uuid.as_ref().to_vec());
+                let uuid_ref: &[u8] = uuid.as_ref();
+                payload.set_uuid(uuid_ref.to_vec());
 
                 if self.timestamp_create.is_none() && self.timestamp_append.is_none() && self.timestamp_seal.is_none() {
                     return Err(PayloadBuildError::MissingField("At least one of the the fields 'timestamp_create', 'timestamp_append' or 'timestamp_seal' must be set".to_string()));
