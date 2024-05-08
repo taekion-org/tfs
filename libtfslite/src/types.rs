@@ -6,7 +6,7 @@ use uuid::serde::compact;
 use crate::protos::payload::{Payload_FileMode, Payload_Permission};
 
 
-#[derive(Serialize_repr, Deserialize_repr, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum FileState {
     Open = 1,
