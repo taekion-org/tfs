@@ -1,0 +1,53 @@
+[package]
+name = "tfslite-sdk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libtfslite = { path = "../libtfslite", version = "0.2", features = ["client", "wasm"]}
+async-stream = "0.3"
+async-trait = "0.1"
+cfg-if = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+cylinder = { version = "0.3", features = ["key-load"] }
+futures = "0.3"
+futures-util = "0.3"
+getrandom = { version = "0.2", features = ["js"] }
+hex = "0.4"
+protobuf = "2"
+rand = "0.8"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+serde_json = "1.0"
+serde_with = { version = "3.4", features = ["macros"] }
+sha2 = "0.10"
+uuid = { version = "1.6", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+wasm-bindgen-test = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+redb = "1.2"
+tokio = { version = "1", features = ["macros", "fs", "io-util", "io-std"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = { version = "0.1" }
+rexie = "0.5"
+gloo-utils = { version = "0.2", features = ["serde"] }
+gloo-timers = { version = "0.3", features = ["futures"] }
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["File", "Blob", "ReadableStream"] }
+wasm-streams = "0.4"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = []
+debug = []
