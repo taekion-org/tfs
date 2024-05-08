@@ -28,6 +28,8 @@ cfg_if! {
 
     } else if #[cfg(target_arch = "wasm32")] {
         use wasm_bindgen::prelude::*;
+        use wasm_bindgen::JsValue;
+        use wasm_bindgen_futures::js_sys;
         use futures::AsyncReadExt;
         use crate::signing::JsSigner;
     }
@@ -221,6 +223,10 @@ impl TFSLiteClient {
             uuid: Uuid::new_v4(),
             chunk_size: DEFAULT_CHUNK_SIZE,
             filename: None,
+
+            prepare_status_callback: None,
+            send_status_callback: None,
+            wait_status_callback: None,
         };
 
         Ok(file_upload)
@@ -242,6 +248,10 @@ impl TFSLiteClient {
             uuid: Uuid::new_v4(),
             chunk_size: DEFAULT_CHUNK_SIZE,
             filename: None,
+
+            prepare_status_callback: None,
+            send_status_callback: None,
+            wait_status_callback: None,
         };
 
         Ok(file_upload)
@@ -264,6 +274,21 @@ pub struct FileUpload {
     uuid: Uuid,
     chunk_size: usize,
     filename: Option<String>,
+
+    #[cfg(not(target_arch = "wasm32"))]
+    prepare_status_callback: Option<Box<dyn FnMut(u64, u64)>>,
+    #[cfg(target_arch = "wasm32")]
+    prepare_status_callback: Option<Box<js_sys::Function>>,
+
+    #[cfg(not(target_arch = "wasm32"))]
+    send_status_callback: Option<Box<dyn FnMut(u64, u64)>>,
+    #[cfg(target_arch = "wasm32")]
+    send_status_callback: Option<Box<js_sys::Function>>,
+
+    #[cfg(not(target_arch = "wasm32"))]
+    wait_status_callback: Option<Box<dyn FnMut(u64, u64)>>,
+    #[cfg(target_arch = "wasm32")]
+    wait_status_callback: Option<Box<js_sys::Function>>,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -287,7 +312,76 @@ impl FileUpload {
         self.filename = Some(filename.to_string());
     }
 
-    pub async fn prepare_transactions(&self) -> Result<(), TFSLiteClientError> {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_prepare_status_callback(&mut self, func: impl FnMut(u64, u64) + 'static) {
+        self.prepare_status_callback = Some(Box::new(func))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn set_prepare_status_callback(&mut self, func: js_sys::Function) {
+        self.prepare_status_callback = Some(Box::new(func))
+    }
+
+    fn call_prepare_status_callback(&mut self, status: u64, total: u64) {
+        if self.prepare_status_callback.is_some() {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.prepare_status_callback.as_mut().unwrap()(status, total);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let func = self.prepare_status_callback.as_mut().unwrap();
+                let _ = func.call2(&JsValue::null(), &JsValue::from(status), &JsValue::from(total));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_send_status_callback(&mut self, func: impl FnMut(u64, u64) + 'static) {
+        self.send_status_callback = Some(Box::new(func))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn set_send_status_callback(&mut self, func: js_sys::Function) {
+        self.send_status_callback = Some(Box::new(func))
+    }
+
+    fn call_send_status_callback(&mut self, status: u64, total: u64) {
+        if self.send_status_callback.is_some() {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.send_status_callback.as_mut().unwrap()(status, total);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let func = self.send_status_callback.as_mut().unwrap();
+                let _ = func.call2(&JsValue::null(), &JsValue::from(status), &JsValue::from(total));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_wait_status_callback(&mut self, func: impl FnMut(u64, u64) + 'static) {
+        self.wait_status_callback = Some(Box::new(func))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn set_wait_status_callback(&mut self, func: js_sys::Function) {
+        self.wait_status_callback = Some(Box::new(func))
+    }
+
+    fn call_wait_status_callback(&mut self, status: u64, total: u64) {
+        if self.wait_status_callback.is_some() {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.wait_status_callback.as_mut().unwrap()(status, total);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let func = self.wait_status_callback.as_mut().unwrap();
+                let _ = func.call2(&JsValue::null(), &JsValue::from(status), &JsValue::from(total));
+            }
+        }
+    }
+
+    pub async fn prepare_transactions(&mut self) -> Result<(), TFSLiteClientError> {
         let mut filename: Option<String> = self.filename.clone();
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -308,8 +402,22 @@ impl FileUpload {
             readable_stream.into_async_read()
         };
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let file_size = f.metadata().await.unwrap().len();
+        #[cfg(target_arch = "wasm32")]
+        let file_size = self.file.size() as u64;
+
+        let chunk_size = self.chunk_size.clone();
+
+        let mut processed_txs: u64 = 0;
+        let mut total_txs = file_size / (chunk_size as u64);
+        if file_size % (chunk_size as u64) > 0 {
+            total_txs += 1;
+        }
+        total_txs += 3;
+
         let stream = stream ! {
-            let mut buffer: Vec<u8> = vec![0; self.chunk_size];
+            let mut buffer: Vec<u8> = vec![0; chunk_size];
             let slice = buffer.as_mut_slice();
 
             while let Ok(bytes_read) = f.read(slice).await {
@@ -328,8 +436,6 @@ impl FileUpload {
         let public_key = self.signer.as_ref().unwrap().public_key().unwrap();
         let mut tx_id_prev: String;
 
-        let store = self.store.lock().unwrap();
-
         let payload = PayloadBuilder::new(PayloadOperation::AccountDeposit)
             .with_address(public_key.as_slice().to_vec())
             .with_amount(FILE_CREATE_COST*10)
@@ -342,8 +448,10 @@ impl FileUpload {
             .build(self.signer.as_ref().unwrap().as_ref())
             .unwrap();
 
+        let store = self.store.lock().unwrap();
         let _ = store.add_tx(&self.uuid, &tx)
             .await;
+        drop(store);
 
         tx_id_prev = tx.get_header_signature().to_string();
 
@@ -360,10 +468,15 @@ impl FileUpload {
             .build(self.signer.as_ref().unwrap().as_ref())
             .unwrap();
 
+        let store = self.store.lock().unwrap();
         let _ = store.add_tx(&self.uuid, &tx)
             .await;
+        drop(store);
 
         tx_id_prev = tx.get_header_signature().to_string();
+
+        processed_txs += 2;
+        self.call_prepare_status_callback(processed_txs, total_txs);
 
         while let Some(data) = stream.next().await {
             debug_println!("Len: {}", data.len());
@@ -380,10 +493,15 @@ impl FileUpload {
                 .build(self.signer.as_ref().unwrap().as_ref())
                 .unwrap();
 
+            let store = self.store.lock().unwrap();
             let _ = store.add_tx(&self.uuid, &tx)
                 .await;
+            drop(store);
 
             tx_id_prev = tx.get_header_signature().to_string();
+
+            processed_txs += 1;
+            self.call_prepare_status_callback(processed_txs, total_txs);
         }
 
         let payload = PayloadBuilder::new(PayloadOperation::FileSeal)
@@ -397,8 +515,13 @@ impl FileUpload {
             .build(self.signer.as_ref().unwrap().as_ref())
             .unwrap();
 
+        let store = self.store.lock().unwrap();
         let _ = store.add_tx(&self.uuid, &tx)
             .await;
+        drop(store);
+
+        processed_txs += 1;
+        self.call_prepare_status_callback(processed_txs, total_txs);
 
         Ok(())
     }
@@ -410,9 +533,9 @@ impl FileUpload {
         }
 
         let store = self.store.lock().unwrap();
-
         let tx_bytes = store.get_tx_bytes(tx_id)
             .await.unwrap();
+        drop(store);
 
         let http_client = reqwest::Client::new();
 
@@ -479,16 +602,17 @@ impl FileUpload {
         }
     }
 
-    pub async fn send_transactions(&self) -> Result<(), TFSLiteClientError> {
+    pub async fn send_transactions(&mut self) -> Result<(), TFSLiteClientError> {
         debug_println!("send_transactions({})", self.uuid);
 
         let store = self.store.lock().unwrap();
-
         let tx_infos = store.get_txs(&self.uuid)
             .await
             .unwrap();
-
         drop(store);
+
+        let mut processed_txs: u64 = 0;
+        let total_txs: u64 = tx_infos.len() as u64;
 
         for tx_info in tx_infos {
             debug_println!("tx_info: {:?}", tx_info);
@@ -497,6 +621,10 @@ impl FileUpload {
             let store = self.store.lock().unwrap();
             store.update_tx(&tx_info.tx_id, Some(tx_submit_id), None)
                 .await.unwrap();
+            drop(store);
+
+            processed_txs += 1;
+            self.call_send_status_callback(processed_txs, total_txs);
         }
 
         Ok(())
@@ -506,10 +634,10 @@ impl FileUpload {
         debug_println!("update_tx_status({})", self.uuid);
 
         let store = self.store.lock().unwrap();
-
         let tx_infos = store.get_txs(&self.uuid)
             .await
             .unwrap();
+        drop(store);
 
         let tx_map: HashMap<TransactionSubmitId, TransactionId> = tx_infos.iter().map(|tx_info| {
             let submit_id = tx_info.submit_id.clone().unwrap();
@@ -527,15 +655,30 @@ impl FileUpload {
                 status = TransactionStatus::Local
             }
             debug_println!("{} -> {:?}", tx_id, status);
+            let store = self.store.lock().unwrap();
             let _ = store.update_tx(tx_id, Some(submit_id), Some(status))
                 .await;
+            drop(store);
         }
 
         Ok(())
     }
 
-    pub async fn wait_transactions(&self) -> Result<(), TFSLiteClientError> {
+    pub async fn wait_transactions(&mut self) -> Result<(), TFSLiteClientError> {
         debug_println!("wait_transactions({})", self.uuid);
+
+        let store = self.store.lock().unwrap();
+        let tx_infos = store.get_txs(&self.uuid)
+            .await
+            .unwrap();
+        drop(store);
+
+
+        let mut committed_txs: HashMap<TransactionId, ()> = HashMap::new();
+        let mut processed_txs: u64 = 0;
+        let total_txs: u64 = tx_infos.len() as u64;
+
+        self.call_wait_status_callback(processed_txs, total_txs);
 
         loop {
             let mut uncommited_count = 0;
@@ -544,16 +687,16 @@ impl FileUpload {
                 .await?;
 
             let store = self.store.lock().unwrap();
-
             let tx_infos = store.get_txs(&self.uuid)
                 .await
                 .unwrap();
-
             drop(store);
 
             for tx_info in tx_infos {
                 debug_println!("tx_info: {:?}", tx_info);
-                if tx_info.status != TransactionStatus::Committed {
+                if tx_info.status == TransactionStatus::Committed {
+                    committed_txs.insert(tx_info.tx_id.clone(), ());
+                } else {
                     uncommited_count += 1;
                 }
 
@@ -565,7 +708,13 @@ impl FileUpload {
                     let store = self.store.lock().unwrap();
                     store.update_tx(&tx_info.tx_id, Some(tx_submit_id), None)
                         .await.unwrap();
+                    drop(store);
                 }
+            }
+
+            if committed_txs.len() as u64 > processed_txs {
+                processed_txs = committed_txs.len() as u64;
+                self.call_wait_status_callback(processed_txs, total_txs);
             }
 
             if uncommited_count == 0 {
@@ -583,6 +732,7 @@ impl FileUpload {
         let store = self.store.lock().unwrap();
         let _ = store.flush_txs(&self.uuid)
             .await;
+        drop(store);
 
         Ok(())
     }
